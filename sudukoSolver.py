@@ -172,7 +172,7 @@ try:
     sudukoGrid = createGrid()    
     drawGrid(sudukoGrid)
 
-    input("Press Enter to solve...")
+    input("Press Enter to solve......")
 
     iteration = 1
     while (updateGrid(sudukoGrid)):
