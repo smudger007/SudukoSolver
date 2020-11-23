@@ -12,8 +12,8 @@ def createGrid():
         gridOut[v[0]] = (0, [v[1]], gridOut[v[0]][2])
     
     # Now apply these initial values.
-    updateGrid(gridOut)
-
+    #updateGrid(gridOut)
+    processNakedSingle(gridOut)
     return gridOut 
 
 def loadValuesFromFile():
@@ -43,15 +43,17 @@ def updateGrid(gridIn):
     identifyHiddenSingle(gridIn, getColCells)
     identifyHiddenSingle(gridIn, getMiniBoxCells)
 
-    updateCount = 0
+    #updateCount = 0
     #  Can we solve any cells?
-    for i, cell in enumerate(gridIn):
+    #for i, cell in enumerate(gridIn):
         # We can solve the cell if it's not been set and has 1 possibility left
-        if (len(cell[1]) == 1 and cell[0] == 0):
-            solveCell(gridIn, i, cell)        
-            updateCount = updateCount +  1
+    #    if (len(cell[1]) == 1 and cell[0] == 0):
+    #        solveCell(gridIn, i, cell)        
+    #        updateCount = updateCount +  1
     
-    return updateCount
+    #return updateCount
+
+    return processNakedSingle(gridIn)
 
 def solveCell(gridIn, indexIn, cellIn):
      # Cell is solved., i.e. set it's value, empty its possibility list. It's dependants are unchanged
@@ -122,6 +124,15 @@ def getMyDependants(myCellRef):
 
 def getBlockValues(gridIn,blockIn):
     return [gridIn[x][0] for x in blockIn if gridIn[x][0] != 0 ]
+
+def processNakedSingle(gridIn):
+    updateCount = 0
+    #  Loop through the grid processing naked singles, i.e. cells with only one possibility left
+    for i, cell in enumerate(gridIn):
+        if (len(cell[1]) == 1 and cell[0] == 0):
+            solveCell(gridIn, i, cell)        
+            updateCount = updateCount +  1
+    return updateCount
 
 def identifyHiddenSingle(gridIn, blockGenerator):
     # good comment needed. but this is in a block of cells
