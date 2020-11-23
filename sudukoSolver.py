@@ -8,11 +8,10 @@ def createGrid():
     # Load initial values from file.
     initialValues = loadValuesFromFile()
     for v in initialValues:
-        # Prime the cell for update, i.e. set its only possibly value. 
+        # Prime the cell for update, i.e. make it a naked single. 
         gridOut[v[0]] = (0, [v[1]], gridOut[v[0]][2])
     
     # Now apply these initial values.
-    #updateGrid(gridOut)
     processNakedSingle(gridOut)
     return gridOut 
 
@@ -36,34 +35,6 @@ def drawGrid(gridIn):
 
 def getCellIndex(rowIn, colIn):
     return (rowIn * 9) + colIn
-
-def updateGrid(gridIn):
-
-    identifyHiddenSingle(gridIn, getRowCells)
-    identifyHiddenSingle(gridIn, getColCells)
-    identifyHiddenSingle(gridIn, getMiniBoxCells)
-
-    #updateCount = 0
-    #  Can we solve any cells?
-    #for i, cell in enumerate(gridIn):
-        # We can solve the cell if it's not been set and has 1 possibility left
-    #    if (len(cell[1]) == 1 and cell[0] == 0):
-    #        solveCell(gridIn, i, cell)        
-    #        updateCount = updateCount +  1
-    
-    #return updateCount
-
-    return processNakedSingle(gridIn)
-
-def solveCell(gridIn, indexIn, cellIn):
-     # Cell is solved., i.e. set it's value, empty its possibility list. It's dependants are unchanged
-    newVal = cellIn[1][0]
-    gridIn[indexIn] = (newVal, [], cellIn[2])
-
-    # We now need to inform its dependants, so they can remove the value from their list of possible values.
-    for dependant in cellIn[2]:
-        # Simply remove the value just set from the dependant (as it can't be this value)
-        gridIn[dependant] = (gridIn[dependant][0], [x for x in gridIn[dependant][1] if x != newVal] ,gridIn[dependant][2] )
 
 def getRowCells(rowRefIn):
     return [x for x in range(rowRefIn * 9, (rowRefIn * 9) + 9)]
@@ -125,6 +96,18 @@ def getMyDependants(myCellRef):
 def getBlockValues(gridIn,blockIn):
     return [gridIn[x][0] for x in blockIn if gridIn[x][0] != 0 ]
 
+
+def numOutstandingCells(gridIn):
+    return len([x for x in gridIn if x[0] == 0])
+
+def updateGrid(gridIn):
+
+    identifyHiddenSingle(gridIn, getRowCells)
+    identifyHiddenSingle(gridIn, getColCells)
+    identifyHiddenSingle(gridIn, getMiniBoxCells)
+
+    return processNakedSingle(gridIn)
+
 def processNakedSingle(gridIn):
     updateCount = 0
     #  Loop through the grid processing naked singles, i.e. cells with only one possibility left
@@ -139,9 +122,7 @@ def identifyHiddenSingle(gridIn, blockGenerator):
     # Note: Block is a row, col or mini box
     for i in range(9):
         block = blockGenerator(i)
-       
         blockValues = getBlockValues(gridIn, block)
-        
         blockPossibles = [x for x in range(1,10) if x not in blockValues]
 
         for i in blockPossibles:       
@@ -154,10 +135,18 @@ def identifyHiddenSingle(gridIn, blockGenerator):
                         break
             if count == 1:
                 gridIn[specialCandidate] = (0, [i], gridIn[specialCandidate][2])
+                print("Hidden Single at (", getRow(specialCandidate), ",", getCol(specialCandidate), ") = ", i)
     return []
 
-def numOutstandingCells(gridIn):
-    return len([x for x in gridIn if x[0] == 0])
+def solveCell(gridIn, indexIn, cellIn):
+     # Cell is solved., i.e. set it's value, empty its possibility list. It's dependants are unchanged
+    newVal = cellIn[1][0]
+    gridIn[indexIn] = (newVal, [], cellIn[2])
+
+    # We now need to inform its dependants, so they can remove the value from their list of possible values.
+    for dependant in cellIn[2]:
+        # Simply remove the value just set from the dependant (as it can't be this value)
+        gridIn[dependant] = (gridIn[dependant][0], [x for x in gridIn[dependant][1] if x != newVal] ,gridIn[dependant][2] )
 
 #============================================
 # Globals / Constants
@@ -190,9 +179,6 @@ try:
         drawGrid(sudukoGrid)
         print("After Iteration ", iteration, " . Outstanding Cells = ", numOutstandingCells(sudukoGrid))
         iteration = iteration + 1
-
-# To DO
-# - Need a count of how many cells are left
 
 
 except Exception as e:
