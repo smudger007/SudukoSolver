@@ -6,8 +6,7 @@ def createGrid():
     gridOut = [(0, [1,2,3,4,5,6,7,8,9], getMyDependants(x)) for x in range(CELLS)]
     
     # Load initial values from file.
-    initialValues = loadValuesFromFile()
-    for v in initialValues:
+    for v in loadValuesFromFile():
         # Prime the cell for update, i.e. make it a naked single. 
         gridOut[v[0]] = (0, [v[1]], gridOut[v[0]][2])
     
@@ -27,7 +26,6 @@ def loadValuesFromFile():
             values.append((i, int(c)))
 
     return values
-
 
 def drawGrid(gridIn):
     vals = [x[0] for x in gridIn]
@@ -93,20 +91,35 @@ def getMyMiniBoxPals(myCellRef):
 def getMyDependants(myCellRef):
     return list(set(getMyColPals(myCellRef) + getMyRowPals(myCellRef) + getMyMiniBoxPals(myCellRef)))
 
+def getBlockIndexes(gridIn, blockIn):
+    return 0
+
 def getBlockValues(gridIn,blockIn):
     return [gridIn[x][0] for x in blockIn if gridIn[x][0] != 0 ]
 
+def getBlockPossiblesByCell(gridIn, blockIn):
+    # This returns just a list of possibles for each cell (list of lists)
+    return [gridIn[x][1] for x in blockIn]
+    #return [gridIn[x][1] for x in blockIn if gridIn[x][1] != [] ]
+
+def getBlockPossibles(gridIn, blockIn):
+    # This returns just a flat list of distinct possibles for the block
+    return list(set([item for sublist in getBlockPossiblesByCell(gridIn, blockIn) for item in sublist])) 
 
 def numOutstandingCells(gridIn):
     return len([x for x in gridIn if x[0] == 0])
 
 def updateGrid(gridIn):
 
-    identifyHiddenSingle(gridIn, getRowCells)
-    identifyHiddenSingle(gridIn, getColCells)
-    identifyHiddenSingle(gridIn, getMiniBoxCells)
+    updateCount = identifyNakedPair(sudukoGrid, getRowCells)
+    updateCount = updateCount + identifyNakedPair(sudukoGrid, getColCells)
+    updateCount = updateCount + identifyNakedPair(sudukoGrid, getMiniBoxCells)
 
-    return processNakedSingle(gridIn)
+    updateCount = updateCount + identifyHiddenSingle(gridIn, getRowCells)
+    updateCount = updateCount + identifyHiddenSingle(gridIn, getColCells)
+    updateCount = updateCount + identifyHiddenSingle(gridIn, getMiniBoxCells)
+
+    return updateCount + processNakedSingle(gridIn)
 
 def processNakedSingle(gridIn):
     updateCount = 0
@@ -120,10 +133,12 @@ def processNakedSingle(gridIn):
 def identifyHiddenSingle(gridIn, blockGenerator):
     # good comment needed. but this is in a block of cells
     # Note: Block is a row, col or mini box
+
+    updatesMade = 0
+
     for i in range(9):
         block = blockGenerator(i)
-        blockValues = getBlockValues(gridIn, block)
-        blockPossibles = [x for x in range(1,10) if x not in blockValues]
+        blockPossibles = getBlockPossibles(gridIn, block)
 
         for i in blockPossibles:       
             count = 0
@@ -135,8 +150,40 @@ def identifyHiddenSingle(gridIn, blockGenerator):
                         break
             if count == 1:
                 gridIn[specialCandidate] = (0, [i], gridIn[specialCandidate][2])
+                updatesMade = updatesMade + 1
                 print("Hidden Single at (", getRow(specialCandidate), ",", getCol(specialCandidate), ") = ", i)
-    return []
+    return updatesMade
+
+def onlyTwoElements(listIn):
+    if len(listIn) == 2:
+        return listIn
+    return []    
+
+def identifyNakedPair(gridIn, blockGenerator):
+
+    updateCount = 0
+    for i in range(9):
+        # Loop through every instance of the block (i.e. row, col, or 3x3 grid)
+        block = blockGenerator(i)
+        possiblesByCell = getBlockPossiblesByCell(gridIn, block)
+        twoAndNullElementPossibles = [onlyTwoElements(x) for x in possiblesByCell]
+        twoElementPossibles = [x for x in twoAndNullElementPossibles if x != []]
+        nakedPairs = [x for x in twoElementPossibles if twoElementPossibles.count(x) == 2]
+        candidatesToRemove = list(set([item for sublist in nakedPairs for item in sublist])) 
+
+        cellsToUpdate = [x for x in block if gridIn[x][1] not in nakedPairs and gridIn[x][0] == 0]
+
+        for toRemove in candidatesToRemove:
+            for cell in cellsToUpdate:
+                if toRemove in gridIn[cell][1]: 
+                    gridIn[cell] = (gridIn[cell][0], [a for a in gridIn[cell][1] if a != toRemove] ,gridIn[cell][2] )
+                    updateCount = updateCount + 1
+                    print("Naked Pair - Removed ", toRemove, " from (", getRow(cell), ",", getCol(cell), ")")
+
+        #print(getBlockPossiblesByCell(gridIn, block))
+        
+    return 0
+
 
 def solveCell(gridIn, indexIn, cellIn):
      # Cell is solved., i.e. set it's value, empty its possibility list. It's dependants are unchanged
@@ -151,6 +198,7 @@ def solveCell(gridIn, indexIn, cellIn):
 #============================================
 # Globals / Constants
 #============================================
+
 CELLS = 9 * 9
 MINI_BOX_CELLS = [ [0,1,2,9,10,11,18,19,20], 
                     [3,4,5,12,13,14,21,22,23],
