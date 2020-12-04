@@ -1,6 +1,25 @@
 import numpy as np
 import sys
 
+#=============================================================================================================================================
+#
+#   Add Comments in here about version history....
+#
+#   Terminology:
+#       - Grid - This is the main 9x9 suduko grid
+#       - Cell - The individual elements inside the grid. There are 9x9 of these.
+#       - Row - 9 rows across the grid (each with 9 cells)
+#       - Column - 9 columns down the grid (each with 9 elements)
+#       - mini-grid - 3x3 sub-grids which divide the main grid into 9
+#       - mini-row - the 3 rows inside a mini-grid (3 elements)
+#       - mini-col - the 3 columns inside a mini-grid (3 elements)
+#       - Block - a distinct set of cells. Could refer to the main grid, a row, a column, a mini-grid, etc.
+#       - Candidate - Each cell has a number of candidates it could be (initially these are 1-9). The objective is to get this to just one.
+#       - Value - When a cell is solved, its value is set
+#       - Dependant - Each cell is has a number of dependants. Setting the value on a cell will update its dependant.  
+#
+#==============================================================================================================================================
+
 def createGrid():
     # Create Initial blank grid (populate dependants)
     gridOut = [(0, [1,2,3,4,5,6,7,8,9], getMyDependants(x)) for x in range(CELLS)]
@@ -31,6 +50,15 @@ def drawGrid(gridIn):
     vals = [x[0] for x in gridIn]
     print(np.array(vals).reshape((9,9))) 
 
+def numOutstandingCells(gridIn):
+    return len([x for x in gridIn if x[0] == 0])
+
+def numOutstandingCandidates(gridIn):
+    count = 0
+    for i in gridIn:
+        count = count + len(i[1])
+    return count
+
 def getCellIndex(rowIn, colIn):
     return (rowIn * 9) + colIn
 
@@ -40,14 +68,14 @@ def getRowCells(rowRefIn):
 def getColCells(colRefIn):
     return [x for x in range(colRefIn, (colRefIn + 73), 9)]
 
-def getMiniBoxCells(mbRefIn):
-    return  MINI_BOX_CELLS[mbRefIn]   
-
 def getRow(myCellRef):
     return int(myCellRef / 9)
 
 def getCol(myCellRef):
     return int(myCellRef % 9)
+
+def getMiniGridCells(mbRefIn):
+    return  MINI_GRID_CELLS[mbRefIn]   
 
 def getMyRowPals(myCellRef):
     myRow = getRow(myCellRef)
@@ -57,13 +85,14 @@ def getMyColPals(myCellRef):
     myCol = getCol(myCellRef)
     return [x for x in getColCells(myCol) if x != myCellRef]
 
-def getMyMiniBoxPals(myCellRef):
-    myMiniBox = getMyMiniBox(myCellRef)
-    return [x for x in MINI_BOX_CELLS[myMiniBox] if x != myCellRef]
+def getMyMiniGridPals(myCellRef):
+    myMiniGrid = getMyMiniGrid(myCellRef)
+    return [x for x in MINI_GRID_CELLS[myMiniGrid] if x != myCellRef]
 
-def getMyMiniBox(myCellRef):
+def getMyMiniGrid(myCellRef):
     myRow = getRow(myCellRef)
     myCol = getCol(myCellRef)
+
     if myRow in [0,1,2]:
         a = {0,1,2}
     elif myRow in [3,4,5]:
@@ -71,7 +100,7 @@ def getMyMiniBox(myCellRef):
     elif myRow in [6,7,8]:
         a = {6,7,8}
     else:
-        raise Exception("getMyMiniBox Error") 
+        raise Exception("getMyMiniGrid Error") 
 
     if myCol in [0,1,2]:
         b = {0,3,6}
@@ -80,16 +109,16 @@ def getMyMiniBox(myCellRef):
     elif myCol in [6,7,8]:
         b = {2,5,8}
     else:
-        raise Exception("getMyMiniBox Error")
+        raise Exception("getMyMiniGrid Error")
 
     return list(a.intersection(b))[0]
 
-def getMyMiniBoxPals(myCellRef):
-    myMiniBox = getMyMiniBox(myCellRef)
-    return [x for x in MINI_BOX_CELLS[myMiniBox] if x != myCellRef]
+def getMyMiniGridPals(myCellRef):
+    myMiniGrid = getMyMiniGrid(myCellRef)
+    return [x for x in MINI_GRID_CELLS[myMiniGrid] if x != myCellRef]
 
 def getMyDependants(myCellRef):
-    return list(set(getMyColPals(myCellRef) + getMyRowPals(myCellRef) + getMyMiniBoxPals(myCellRef)))
+    return list(set(getMyColPals(myCellRef) + getMyRowPals(myCellRef) + getMyMiniGridPals(myCellRef)))
 
 def getBlockIndexes(gridIn, blockIn):
     return 0
@@ -97,29 +126,17 @@ def getBlockIndexes(gridIn, blockIn):
 def getBlockValues(gridIn,blockIn):
     return [gridIn[x][0] for x in blockIn if gridIn[x][0] != 0 ]
 
-def getBlockPossiblesByCell(gridIn, blockIn):
-    # This returns just a list of possibles for each cell (list of lists)
+def getBlockCandidatesByCell(gridIn, blockIn):
+    # This returns a list of possibles for each cell (list of lists)
     return [gridIn[x][1] for x in blockIn]
-    #return [gridIn[x][1] for x in blockIn if gridIn[x][1] != [] ]
-
-def getBlockPossibles(gridIn, blockIn):
+    
+def getBlockCandidates(gridIn, blockIn):
     # This returns just a flat list of distinct possibles for the block
-    return list(set([item for sublist in getBlockPossiblesByCell(gridIn, blockIn) for item in sublist])) 
-
-def numOutstandingCells(gridIn):
-    return len([x for x in gridIn if x[0] == 0])
+    return list(set([item for sublist in getBlockCandidatesByCell(gridIn, blockIn) for item in sublist])) 
 
 def updateGrid(gridIn):
 
-    updateCount = identifyNakedPair(sudukoGrid, getRowCells)
-    updateCount = updateCount + identifyNakedPair(sudukoGrid, getColCells)
-    updateCount = updateCount + identifyNakedPair(sudukoGrid, getMiniBoxCells)
-
-    updateCount = updateCount + identifyHiddenSingle(gridIn, getRowCells)
-    updateCount = updateCount + identifyHiddenSingle(gridIn, getColCells)
-    updateCount = updateCount + identifyHiddenSingle(gridIn, getMiniBoxCells)
-
-    return updateCount + processNakedSingle(gridIn)
+    return processPPoT(gridIn) + processNakedPairs(gridIn) + processHiddenSingles(gridIn) + processNakedSingle(gridIn)
 
 def processNakedSingle(gridIn):
     updateCount = 0
@@ -130,15 +147,17 @@ def processNakedSingle(gridIn):
             updateCount = updateCount +  1
     return updateCount
 
+def processHiddenSingles(gridIn):
+    return identifyHiddenSingle(gridIn, getRowCells) + identifyHiddenSingle(gridIn, getColCells) + identifyHiddenSingle(gridIn, getMiniGridCells)
+
 def identifyHiddenSingle(gridIn, blockGenerator):
     # good comment needed. but this is in a block of cells
-    # Note: Block is a row, col or mini box
 
     updatesMade = 0
 
     for i in range(9):
         block = blockGenerator(i)
-        blockPossibles = getBlockPossibles(gridIn, block)
+        blockPossibles = getBlockCandidates(gridIn, block)
 
         for i in blockPossibles:       
             count = 0
@@ -151,7 +170,7 @@ def identifyHiddenSingle(gridIn, blockGenerator):
             if count == 1:
                 gridIn[specialCandidate] = (0, [i], gridIn[specialCandidate][2])
                 updatesMade = updatesMade + 1
-                print("Hidden Single at (", getRow(specialCandidate), ",", getCol(specialCandidate), ") = ", i)
+                #print("Hidden Single at (", getRow(specialCandidate), ",", getCol(specialCandidate), ") = ", i)
     return updatesMade
 
 def onlyTwoElements(listIn):
@@ -159,13 +178,16 @@ def onlyTwoElements(listIn):
         return listIn
     return []    
 
+def processNakedPairs(gridIn):
+    return identifyNakedPair(sudukoGrid, getRowCells) + identifyNakedPair(sudukoGrid, getColCells) + identifyNakedPair(sudukoGrid, getMiniGridCells)
+
 def identifyNakedPair(gridIn, blockGenerator):
 
     updateCount = 0
     for i in range(9):
         # Loop through every instance of the block (i.e. row, col, or 3x3 grid)
         block = blockGenerator(i)
-        possiblesByCell = getBlockPossiblesByCell(gridIn, block)
+        possiblesByCell = getBlockCandidatesByCell(gridIn, block)
         twoAndNullElementPossibles = [onlyTwoElements(x) for x in possiblesByCell]
         twoElementPossibles = [x for x in twoAndNullElementPossibles if x != []]
         nakedPairs = [x for x in twoElementPossibles if twoElementPossibles.count(x) == 2]
@@ -178,18 +200,84 @@ def identifyNakedPair(gridIn, blockGenerator):
                 if toRemove in gridIn[cell][1]: 
                     gridIn[cell] = (gridIn[cell][0], [a for a in gridIn[cell][1] if a != toRemove] ,gridIn[cell][2] )
                     updateCount = updateCount + 1
-                    print("Naked Pair - Removed ", toRemove, " from (", getRow(cell), ",", getCol(cell), ")")
+                    #print("Naked Pair - Removed ", toRemove, " from (", getRow(cell), ",", getCol(cell), ")")        
+    return updateCount
 
-        #print(getBlockPossiblesByCell(gridIn, block))
-        
-    return 0
+def getMiniGridRowRefs(miniBlockIn):
+    rowRefs = []
+    for i in range(3):
+        rowRefs.append([miniBlockIn[j] for j in range(i*3, (i*3) + 3)])
+    return rowRefs
+
+def getMiniGridColRefs(miniBlockIn):
+    colRefs = []
+    for i in range(3):
+        colRefs.append([miniBlockIn[j] for j in range(i, i+7, 3)])
+    return colRefs
+
+def getCandidateIsPossibilityCount(gridIn, blockIn, valIn):
+    return len([p for p in blockIn if valIn in gridIn[p][1]])
+
+def removeCandidateFromCells(gridIn, cellsIn, candidateIn):
+    for cell in cellsIn:
+         gridIn[cell] = (gridIn[cell][0], [a for a in gridIn[cell][1] if a != candidateIn] ,gridIn[cell][2] )
+
+
+def checkMiniRowColForPPoT(gridIn, miniBlockIn, typeIn):
+    
+    count = 0
+
+    # Get the list of miniLines, dependant on type (row or col)
+    if typeIn == 'R':
+        miniLines = getMiniGridRowRefs(miniBlockIn)
+    else:
+        miniLines = getMiniGridColRefs(miniBlockIn)
+
+    # Let's check each mini-Line
+    for miniLine in miniLines:
+        # Check each candidate against each mini-row 
+        for c in range(1,10):
+            # Check for 2 or more adjacent cells with c as a possible value.
+            # First check middle line, as we can only have adjacent cells if it's a possibility here 
+            if c in gridIn[miniLine[1]][1]:
+                # We have a pointing pair/triple if:
+                #   -  candidate is a possibility in two or more cells AND
+                #   -  candidate is not a possibility elsewhere in this mini-grid
+                miniLineCount = getCandidateIsPossibilityCount(gridIn, miniLine, c)
+
+                if miniLineCount >= 2 and miniLineCount == getCandidateIsPossibilityCount(gridIn, miniBlockIn, c):             
+                    # OK, we do have one. So we need to remove this candidate from cells in same row (outside of this mini-block)
+                    if typeIn == 'R':
+                        fullLine = getRowCells(getRow(miniLine[0]))
+                    else: 
+                        fullLine = getColCells(getCol(miniLine[0]))                   
+
+                    cellsToUpdate = [t for t in fullLine if t not in miniLine]
+                    removeCandidateFromCells(gridIn, cellsToUpdate, c)
+
+def processPPoT(gridIn):
+
+    # Identify Pointing Pairs or Triples..
+
+    gridCandidateCountBefore = numOutstandingCandidates(gridIn)
+
+    # Work through each mini-block in turn
+    for i in range(9):
+        miniBlock = getMiniGridCells(i)
+        checkMiniRowColForPPoT(gridIn, miniBlock, 'R')
+        checkMiniRowColForPPoT(gridIn, miniBlock, 'C')
+
+    gridCandidateCountAfter = numOutstandingCandidates(gridIn)
+    #print(f"PPOT: Before - {gridCandidateCountBefore}   -   After - {gridCandidateCountAfter}")
+
+    return gridCandidateCountBefore - gridCandidateCountAfter
 
 
 def solveCell(gridIn, indexIn, cellIn):
      # Cell is solved., i.e. set it's value, empty its possibility list. It's dependants are unchanged
     newVal = cellIn[1][0]
     gridIn[indexIn] = (newVal, [], cellIn[2])
-
+    #print(f"SolveCell: - {indexIn} - {cellIn}")
     # We now need to inform its dependants, so they can remove the value from their list of possible values.
     for dependant in cellIn[2]:
         # Simply remove the value just set from the dependant (as it can't be this value)
@@ -200,7 +288,7 @@ def solveCell(gridIn, indexIn, cellIn):
 #============================================
 
 CELLS = 9 * 9
-MINI_BOX_CELLS = [ [0,1,2,9,10,11,18,19,20], 
+MINI_GRID_CELLS = [ [0,1,2,9,10,11,18,19,20], 
                     [3,4,5,12,13,14,21,22,23],
                     [6,7,8,15,16,17,24,25,26],
                     [27,28,29,36,37,38,45,46,47],
@@ -223,11 +311,13 @@ try:
     input("Press Enter to solve......")
 
     iteration = 1
-    while (updateGrid(sudukoGrid)):
+    while (updateGrid(sudukoGrid) and numOutstandingCells(sudukoGrid) > 0 ):
         drawGrid(sudukoGrid)
-        print("After Iteration ", iteration, " . Outstanding Cells = ", numOutstandingCells(sudukoGrid))
+        print(f"After Iteration {iteration} - Outstanding Cells = {numOutstandingCells(sudukoGrid)} outstanding candidates = {numOutstandingCandidates(sudukoGrid)}")
         iteration = iteration + 1
 
+    print(f"Complete - Outstanding Cells = {numOutstandingCells(sudukoGrid)} outstanding candidates = {numOutstandingCandidates(sudukoGrid)}")
+    drawGrid(sudukoGrid)
 
 except Exception as e:
     print("Aborting..../n", e)
