@@ -18,19 +18,24 @@ import sys
 #       - Value - When a cell is solved, its value is set
 #       - Dependant - Each cell is has a number of dependants. Setting the value on a cell will update its dependant.  
 #
+#       A description of the suduko techniques employed can be found here:  https://www.youtube.com/watch?v=b123EURtu3I 
 #==============================================================================================================================================
 
+#============================================
+# Functions / Procedures
+#============================================
+
 def createGrid():
-    # Create Initial blank grid (populate dependants)
+    # Create Initial blank grid.
     gridOut = [(0, [1,2,3,4,5,6,7,8,9], getMyDependants(x)) for x in range(CELLS)]
     
     # Load initial values from file.
     for v in loadValuesFromFile():
-        # Prime the cell for update, i.e. make it a naked single. 
+        # Prime each cell given an initial value for update, i.e. make it a naked single. 
         gridOut[v[0]] = (0, [v[1]], gridOut[v[0]][2])
     
     # Now apply these initial values.
-    processNakedSingle(gridOut)
+    doNakedSingle(gridOut)
     return gridOut 
 
 def loadValuesFromFile():
@@ -134,22 +139,6 @@ def getBlockCandidates(gridIn, blockIn):
     # This returns just a flat list of distinct possibles for the block
     return list(set([item for sublist in getBlockCandidatesByCell(gridIn, blockIn) for item in sublist])) 
 
-def updateGrid(gridIn):
-
-    return processPPoT(gridIn) + processNakedPairs(gridIn) + processHiddenSingles(gridIn) + processNakedSingle(gridIn)
-
-def processNakedSingle(gridIn):
-    updateCount = 0
-    #  Loop through the grid processing naked singles, i.e. cells with only one possibility left
-    for i, cell in enumerate(gridIn):
-        if (len(cell[1]) == 1 and cell[0] == 0):
-            solveCell(gridIn, i, cell)        
-            updateCount = updateCount +  1
-    return updateCount
-
-def processHiddenSingles(gridIn):
-    return identifyHiddenSingle(gridIn, getRowCells) + identifyHiddenSingle(gridIn, getColCells) + identifyHiddenSingle(gridIn, getMiniGridCells)
-
 def identifyHiddenSingle(gridIn, blockGenerator):
     # good comment needed. but this is in a block of cells
 
@@ -178,9 +167,6 @@ def onlyTwoElements(listIn):
         return listIn
     return []    
 
-def processNakedPairs(gridIn):
-    return identifyNakedPair(sudukoGrid, getRowCells) + identifyNakedPair(sudukoGrid, getColCells) + identifyNakedPair(sudukoGrid, getMiniGridCells)
-
 def identifyNakedPair(gridIn, blockGenerator):
 
     updateCount = 0
@@ -199,8 +185,7 @@ def identifyNakedPair(gridIn, blockGenerator):
             for cell in cellsToUpdate:
                 if toRemove in gridIn[cell][1]: 
                     gridIn[cell] = (gridIn[cell][0], [a for a in gridIn[cell][1] if a != toRemove] ,gridIn[cell][2] )
-                    updateCount = updateCount + 1
-                    #print("Naked Pair - Removed ", toRemove, " from (", getRow(cell), ",", getCol(cell), ")")        
+                    updateCount = updateCount + 1       
     return updateCount
 
 def getMiniGridRowRefs(miniBlockIn):
@@ -255,11 +240,36 @@ def checkMiniRowColForPPoT(gridIn, miniBlockIn, typeIn):
                     cellsToUpdate = [t for t in fullLine if t not in miniLine]
                     removeCandidateFromCells(gridIn, cellsToUpdate, c)
 
-def processPPoT(gridIn):
+def solveCell(gridIn, indexIn, cellIn):
+     # Cell is solved. So, set it's value, empty its possibility list and inform its dependants.
+    newVal = cellIn[1][0]
+    gridIn[indexIn] = (newVal, [], cellIn[2])
+    
+    # We now need to inform its dependants, so they can remove the value from their list of possible values.
+    for dependant in cellIn[2]:
+        # Simply remove the value just set from the dependant (as it can't be this value)
+        gridIn[dependant] = (gridIn[dependant][0], [x for x in gridIn[dependant][1] if x != newVal] ,gridIn[dependant][2] )
+
+def doNakedSingle(gridIn):
+    updateCount = 0
+    #  Loop through the grid processing naked singles, i.e. cells with only one possibility left
+    for i, cell in enumerate(gridIn):
+        if (len(cell[1]) == 1 and cell[0] == 0):
+            solveCell(gridIn, i, cell)        
+            updateCount = updateCount +  1
+    return updateCount
+
+def doHiddenSingles(gridIn):
+    # Do this by row, then column and then mini-grid
+    return identifyHiddenSingle(gridIn, getRowCells) + identifyHiddenSingle(gridIn, getColCells) + identifyHiddenSingle(gridIn, getMiniGridCells)
+
+def doNakedPairs(gridIn):
+    return identifyNakedPair(sudukoGrid, getRowCells) + identifyNakedPair(sudukoGrid, getColCells) + identifyNakedPair(sudukoGrid, getMiniGridCells)
+
+def doPPoT(gridIn):
 
     # Identify Pointing Pairs or Triples..
-
-    gridCandidateCountBefore = numOutstandingCandidates(gridIn)
+    preCount = numOutstandingCandidates(gridIn)
 
     # Work through each mini-block in turn
     for i in range(9):
@@ -267,22 +277,46 @@ def processPPoT(gridIn):
         checkMiniRowColForPPoT(gridIn, miniBlock, 'R')
         checkMiniRowColForPPoT(gridIn, miniBlock, 'C')
 
-    gridCandidateCountAfter = numOutstandingCandidates(gridIn)
-    #print(f"PPOT: Before - {gridCandidateCountBefore}   -   After - {gridCandidateCountAfter}")
+    postCount = numOutstandingCandidates(gridIn)
 
-    return gridCandidateCountBefore - gridCandidateCountAfter
+    return preCount - postCount
 
+def doClaimingPoT(gridIn):
+    # Identify and process Claiming Pairs or Triples
+    # When a certain candidate appears in only 2 (or 3) cells in a row of col, and the cells are also in a mini-grid, they are called
+    # a claiming pair (or triple).
+    # All other appearances of the candidate in the same mini-grid, if any, can be eliminated. 
 
-def solveCell(gridIn, indexIn, cellIn):
-     # Cell is solved., i.e. set it's value, empty its possibility list. It's dependants are unchanged
-    newVal = cellIn[1][0]
-    gridIn[indexIn] = (newVal, [], cellIn[2])
-    #print(f"SolveCell: - {indexIn} - {cellIn}")
-    # We now need to inform its dependants, so they can remove the value from their list of possible values.
-    for dependant in cellIn[2]:
-        # Simply remove the value just set from the dependant (as it can't be this value)
-        gridIn[dependant] = (gridIn[dependant][0], [x for x in gridIn[dependant][1] if x != newVal] ,gridIn[dependant][2] )
+    preCount = numOutstandingCandidates(gridIn)
 
+    lineFunctions = [getRowCells, getColCells]
+
+    for f in lineFunctions:
+        # Work through row or column in turn
+        for i in range(9):
+            line = f(i)
+            # Check how many times each candidate is still a possibility in this line. If 2 or 3 then a possible claiming pair (or triple)
+            for c in range(1,10):
+                cCount = getCandidateIsPossibilityCount(gridIn, line, c)
+                if cCount == 2 or cCount == 3:
+                    # Now check each mini row or col inside this row or col. If a match then we do have a claiming pair (or triple)
+                    for x in range(0, 7, 3):
+                        miniLine = [line[x], line[x+1], line[x+2]]
+                        mcCount = getCandidateIsPossibilityCount(gridIn, miniLine, c)
+                        if cCount == mcCount:
+                            miniGrid = getMiniGridCells(getMyMiniGrid(miniLine[0]))
+                            cellsToUpdate = [t for t in miniGrid if t not in miniLine]
+                            removeCandidateFromCells(gridIn, cellsToUpdate, c)
+                            continue
+                        else:
+                            if mcCount > 0: continue
+
+    postCount = numOutstandingCandidates(gridIn)
+    return preCount - postCount
+
+def updateGrid(gridIn):
+    return doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
+    
 #============================================
 # Globals / Constants
 #============================================
@@ -307,6 +341,9 @@ try:
      
     sudukoGrid = createGrid()    
     drawGrid(sudukoGrid)
+
+    #processClaimingPairs(sudukoGrid)
+    #sys.exit()
 
     input("Press Enter to solve......")
 
