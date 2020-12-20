@@ -1,9 +1,13 @@
 import numpy as np
 import sys
+from itertools import combinations
 
 #=============================================================================================================================================
 #
-#   Add Comments in here about version history....
+#   Mark Smith
+#   -----------
+#
+#   V1.0 - DD-MMM-YYYY  - Initial Version
 #
 #   Terminology:
 #       - Grid - This is the main 9x9 suduko grid
@@ -14,7 +18,7 @@ import sys
 #       - mini-row - the 3 rows inside a mini-grid (3 elements)
 #       - mini-col - the 3 columns inside a mini-grid (3 elements)
 #       - Block - a distinct set of cells. Could refer to the main grid, a row, a column, a mini-grid, etc.
-#       - Candidate - Each cell has a number of candidates it could be (initially these are 1-9). The objective is to get this to just one.
+#       - Candidate - Each cell has a number of candidate values (initially these are 1-9). The objective is to get this to just one.
 #       - Value - When a cell is solved, its value is set
 #       - Dependant - Each cell is has a number of dependants. Setting the value on a cell will update its dependant.  
 #
@@ -288,11 +292,10 @@ def doClaimingPoT(gridIn):
     # All other appearances of the candidate in the same mini-grid, if any, can be eliminated. 
 
     preCount = numOutstandingCandidates(gridIn)
+    lineFunctions = [getRowCells, getColCells, getMiniGridCells]
 
-    lineFunctions = [getRowCells, getColCells]
-
+    # Work through rows then columns in turn  (called line below)
     for f in lineFunctions:
-        # Work through row or column in turn
         for i in range(9):
             line = f(i)
             # Check how many times each candidate is still a possibility in this line. If 2 or 3 then a possible claiming pair (or triple)
@@ -307,15 +310,58 @@ def doClaimingPoT(gridIn):
                             miniGrid = getMiniGridCells(getMyMiniGrid(miniLine[0]))
                             cellsToUpdate = [t for t in miniGrid if t not in miniLine]
                             removeCandidateFromCells(gridIn, cellsToUpdate, c)
-                            continue
+                            break
                         else:
-                            if mcCount > 0: continue
+                            if mcCount > 0: break
 
     postCount = numOutstandingCandidates(gridIn)
     return preCount - postCount
 
+def doNakedTriples(gridIn):
+     # Identify and process Claiming Pairs or Triples
+     # Three cells in a row, column or mini-grid, having only the same three candidates, or their subset, are called a naked triple.
+     # All other appearances of the same candidates can be eliminated, if they are in the same row, column or mini-grid.
+
+    preCount = numOutstandingCandidates(gridIn)
+
+    blockFunctions = [getRowCells, getColCells, getMiniGridCells]
+
+    checkingSet = set()
+
+    # Loop through all the rows, columns and then mini-grids
+    for f in blockFunctions:
+        for i in range(9):
+            block = f(i)
+            # We're only interested in cells that have 2 or 3 candidates.          
+            possibles = [cell for cell in block if len(gridIn[cell][1]) == 2 or len(gridIn[cell][1]) == 3]
+            if len(possibles) < 3: continue
+           
+            # If there are more than 3 such cells, then we'll need to check the 3-cell combinations of these. 
+            combs = list(combinations(possibles, 3)) 
+            for comb in combs:
+                # Add the candidates for the combination to a set. A pointing triple will have 3 possibilities.
+                checkingSet.clear()
+                # Double check each cell in this combination has more than one combination, as these could re reduced from a previous combination 
+                if len(gridIn[comb[0]][1]) > 1 and len(gridIn[comb[1]][1]) > 1 and len(gridIn[comb[2]][1]) > 1:
+                    for j in range(3):
+                        [checkingSet.add(val) for val in gridIn[comb[j]][1]]
+                        if len(checkingSet) > 3: 
+                            break                 
+                    if len(checkingSet) == 3:
+                        # We have a pointing triple. Let's remove these as canidated from other cells in row, col or mini-grid.
+                        cellsToUpdate = [t for t in block if  t != comb[0] and t != comb[1] and t != comb[2]]
+                        [removeCandidateFromCells(gridIn, cellsToUpdate, c) for c in checkingSet ]
+
+    postCount = numOutstandingCandidates(gridIn)
+
+    #print(f"Naked Triples - Before = {preCount}  Post = {postCount}")
+
+    return preCount - postCount
+
+
 def updateGrid(gridIn):
-    return doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
+    #return doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
+    return doNakedTriples(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
     
 #============================================
 # Globals / Constants
@@ -342,14 +388,11 @@ try:
     sudukoGrid = createGrid()    
     drawGrid(sudukoGrid)
 
-    #processClaimingPairs(sudukoGrid)
-    #sys.exit()
-
     input("Press Enter to solve......")
 
     iteration = 1
     while (updateGrid(sudukoGrid) and numOutstandingCells(sudukoGrid) > 0 ):
-        drawGrid(sudukoGrid)
+        #drawGrid(sudukoGrid)
         print(f"After Iteration {iteration} - Outstanding Cells = {numOutstandingCells(sudukoGrid)} outstanding candidates = {numOutstandingCandidates(sudukoGrid)}")
         iteration = iteration + 1
 
