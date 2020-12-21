@@ -171,27 +171,6 @@ def onlyTwoElements(listIn):
         return listIn
     return []    
 
-def identifyNakedPair(gridIn, blockGenerator):
-
-    updateCount = 0
-    for i in range(9):
-        # Loop through every instance of the block (i.e. row, col, or 3x3 grid)
-        block = blockGenerator(i)
-        possiblesByCell = getBlockCandidatesByCell(gridIn, block)
-        twoAndNullElementPossibles = [onlyTwoElements(x) for x in possiblesByCell]
-        twoElementPossibles = [x for x in twoAndNullElementPossibles if x != []]
-        nakedPairs = [x for x in twoElementPossibles if twoElementPossibles.count(x) == 2]
-        candidatesToRemove = list(set([item for sublist in nakedPairs for item in sublist])) 
-
-        cellsToUpdate = [x for x in block if gridIn[x][1] not in nakedPairs and gridIn[x][0] == 0]
-
-        for toRemove in candidatesToRemove:
-            for cell in cellsToUpdate:
-                if toRemove in gridIn[cell][1]: 
-                    gridIn[cell] = (gridIn[cell][0], [a for a in gridIn[cell][1] if a != toRemove] ,gridIn[cell][2] )
-                    updateCount = updateCount + 1       
-    return updateCount
-
 def getMiniGridRowRefs(miniBlockIn):
     rowRefs = []
     for i in range(3):
@@ -225,6 +204,7 @@ def checkMiniRowColForPPoT(gridIn, miniBlockIn, typeIn):
     # Let's check each mini-Line
     for miniLine in miniLines:
         # Check each candidate against each mini-row 
+        
         for c in range(1,10):
             # Check for 2 or more adjacent cells with c as a possible value.
             # First check middle line, as we can only have adjacent cells if it's a possibility here 
@@ -266,9 +246,6 @@ def doNakedSingle(gridIn):
 def doHiddenSingles(gridIn):
     # Do this by row, then column and then mini-grid
     return identifyHiddenSingle(gridIn, getRowCells) + identifyHiddenSingle(gridIn, getColCells) + identifyHiddenSingle(gridIn, getMiniGridCells)
-
-def doNakedPairs(gridIn):
-    return identifyNakedPair(sudukoGrid, getRowCells) + identifyNakedPair(sudukoGrid, getColCells) + identifyNakedPair(sudukoGrid, getMiniGridCells)
 
 def doPPoT(gridIn):
 
@@ -317,6 +294,35 @@ def doClaimingPoT(gridIn):
     postCount = numOutstandingCandidates(gridIn)
     return preCount - postCount
 
+
+def doNakedPairs(gridIn):
+
+    preCount = numOutstandingCandidates(gridIn)
+
+    blockFunctions = [getRowCells, getColCells, getMiniGridCells]
+
+    updateCount = 0
+
+    # Loop through all the rows, columns and then mini-grids
+    for f in blockFunctions:
+        for i in range(9):
+            # Loop through every instance of the block (i.e. row, col, or 3x3 grid)
+            block = f(i)
+            possiblesByCell = getBlockCandidatesByCell(gridIn, block)
+            twoAndNullElementPossibles = [onlyTwoElements(x) for x in possiblesByCell]
+            twoElementPossibles = [x for x in twoAndNullElementPossibles if x != []]
+            nakedPairs = [x for x in twoElementPossibles if twoElementPossibles.count(x) == 2]
+            candidatesToRemove = list(set([item for sublist in nakedPairs for item in sublist])) 
+
+            cellsToUpdate = [x for x in block if gridIn[x][1] not in nakedPairs and gridIn[x][0] == 0]
+            [removeCandidateFromCells(gridIn, cellsToUpdate, c) for c in candidatesToRemove ]
+
+    postCount = numOutstandingCandidates(gridIn)
+
+    return preCount - postCount
+
+
+
 def doNakedTriples(gridIn):
      # Identify and process Claiming Pairs or Triples
      # Three cells in a row, column or mini-grid, having only the same three candidates, or their subset, are called a naked triple.
@@ -357,6 +363,7 @@ def doNakedTriples(gridIn):
     #print(f"Naked Triples - Before = {preCount}  Post = {postCount}")
 
     return preCount - postCount
+
 
 
 def updateGrid(gridIn):
