@@ -143,29 +143,6 @@ def getBlockCandidates(gridIn, blockIn):
     # This returns just a flat list of distinct possibles for the block
     return list(set([item for sublist in getBlockCandidatesByCell(gridIn, blockIn) for item in sublist])) 
 
-def identifyHiddenSingle(gridIn, blockGenerator):
-    # good comment needed. but this is in a block of cells
-
-    updatesMade = 0
-
-    for i in range(9):
-        block = blockGenerator(i)
-        blockPossibles = getBlockCandidates(gridIn, block)
-
-        for i in blockPossibles:       
-            count = 0
-            for j in block:
-                if i in gridIn[j][1]:
-                    specialCandidate = j
-                    count = count + 1
-                    if count > 1:
-                        break
-            if count == 1:
-                gridIn[specialCandidate] = (0, [i], gridIn[specialCandidate][2])
-                updatesMade = updatesMade + 1
-                #print("Hidden Single at (", getRow(specialCandidate), ",", getCol(specialCandidate), ") = ", i)
-    return updatesMade
-
 def onlyTwoElements(listIn):
     if len(listIn) == 2:
         return listIn
@@ -244,19 +221,41 @@ def doNakedSingle(gridIn):
     return updateCount
 
 def doHiddenSingles(gridIn):
-    # Do this by row, then column and then mini-grid
-    return identifyHiddenSingle(gridIn, getRowCells) + identifyHiddenSingle(gridIn, getColCells) + identifyHiddenSingle(gridIn, getMiniGridCells)
+    # good comment needed. 
+
+    preCount = numOutstandingCandidates(gridIn)
+    lineFunctions = [getRowCells, getColCells, getMiniGridCells]
+
+     # Work through rows, columns and mini-grids in turn
+    for f in lineFunctions:
+        for a in range(9):
+            block = f(a)
+            blockPossibles = getBlockCandidates(gridIn, block)
+
+            for i in blockPossibles:       
+                count = 0
+                for j in block:
+                    if i in gridIn[j][1]:
+                        specialCandidate = j
+                        count = count + 1
+                        if count > 1:
+                            break
+                if count == 1: gridIn[specialCandidate] = (0, [i], gridIn[specialCandidate][2])
+                    
+    postCount = numOutstandingCandidates(gridIn)
+    return preCount - postCount
+
 
 def doPPoT(gridIn):
 
     # Identify Pointing Pairs or Triples..
     preCount = numOutstandingCandidates(gridIn)
 
-    # Work through each mini-block in turn
+    # Work through each mini-grid in turn
     for i in range(9):
-        miniBlock = getMiniGridCells(i)
-        checkMiniRowColForPPoT(gridIn, miniBlock, 'R')
-        checkMiniRowColForPPoT(gridIn, miniBlock, 'C')
+        miniGrid = getMiniGridCells(i)
+        checkMiniRowColForPPoT(gridIn, miniGrid, 'R')
+        checkMiniRowColForPPoT(gridIn, miniGrid, 'C')
 
     postCount = numOutstandingCandidates(gridIn)
 
