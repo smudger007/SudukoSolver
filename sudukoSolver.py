@@ -363,11 +363,59 @@ def doNakedTriples(gridIn):
 
     return preCount - postCount
 
+def doXWing(gridIn):
 
+    # When a candidate appears in four cells that form the corners of a rectangle (or square) 
+    # and it appears only in the two cells in both rows, all other appearances of the candidate 
+    # in the two columns, if any, can be elimated. It also works if the rows and columns are switched.
+
+    preCount = numOutstandingCandidates(gridIn)
+    blockFunctions = [getRowCells, getColCells]
+    oppFunctions = [getColCells, getRowCells]
+
+    # First try rows (elimating from crossing columns).
+    # They try columns (eliminating from crossing rows)
+
+    for e, bf in enumerate(blockFunctions):
+        xwPossibles = []
+        xwDefinites = []
+        
+        # Identify xwing possibles.... (look for candidates that only exist in 2 cells of this line) 
+        for i in range(9):
+            line = bf(i)          
+            candidatesByCell = getBlockCandidatesByCell(gridIn, line)
+            flatCandidatesByCell = [item for sublist in candidatesByCell for item in sublist]
+            xwPossibleValues = list(set([i for i in flatCandidatesByCell if flatCandidatesByCell.count(i) == 2]))
+            
+            for p in xwPossibleValues:
+                indexes = [index for index,choices in enumerate(candidatesByCell) if p in choices ]
+                xwPossibles.append((p, i, indexes[0], indexes[1]))
+
+        # We have some possibles. Let's cross check to see if a second line makes the rectangle (or square). 
+        for m, xwp in enumerate(xwPossibles):
+            for n in range(m+1, len(xwPossibles)):
+                if xwp[0] == xwPossibles[n][0] and xwp[2] == xwPossibles[n][2] and xwp[3] == xwPossibles[n][3]:
+                    xwDefinites.append(xwp)
+                    xwDefinites.append(xwPossibles[n])
+       
+        # We now have some xwings, lets handle them...
+        for s in range(0, len(xwDefinites), 2):
+            # If we are looking at rows, then we want the crossing column, and vice versa.
+            oppositeA = oppFunctions[e](xwDefinites[s][2])
+            oppositeB = oppFunctions[e](xwDefinites[s][3])            
+            toUpdateA = [h for g,h in enumerate(oppositeA) if g != xwDefinites[s][1] and  g != xwDefinites[s+1][1]]
+            toUpdateB = [h for g,h in enumerate(oppositeB) if g != xwDefinites[s][1] and  g != xwDefinites[s+1][1]]
+            removeCandidateFromCells(gridIn, toUpdateA, xwDefinites[s][0])
+            removeCandidateFromCells(gridIn, toUpdateB, xwDefinites[s][0])
+            
+    postCount = numOutstandingCandidates(gridIn)
+    #print(f"X Wing - Before = {preCount}  Post = {postCount}")
+    return preCount - postCount
 
 def updateGrid(gridIn):
     #return doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
-    return doNakedTriples(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
+    #return doNakedTriples(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
+    return doXWing(gridIn) + doNakedTriples(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
     
 #============================================
 # Globals / Constants
@@ -393,6 +441,9 @@ try:
      
     sudukoGrid = createGrid()    
     drawGrid(sudukoGrid)
+
+    #doXWing(sudukoGrid)
+    #sys.exit()
 
     input("Press Enter to solve......")
 
