@@ -300,8 +300,6 @@ def doNakedPairs(gridIn):
 
     blockFunctions = [getRowCells, getColCells, getMiniGridCells]
 
-    updateCount = 0
-
     # Loop through all the rows, columns and then mini-grids
     for f in blockFunctions:
         for i in range(9):
@@ -412,10 +410,41 @@ def doXWing(gridIn):
     #print(f"X Wing - Before = {preCount}  Post = {postCount}")
     return preCount - postCount
 
+def doHiddenPairs(gridIn):
+    # When a pair of candidates appear in only two cells in a row, col or mini-grid, but aren't the only candidates in the cells, 
+    # they are called a hidden pair. All candidates other than the pair in the cells can be eliminated, yielding a naked pair.
+
+    preCount = numOutstandingCandidates(gridIn)
+    blockFunctions = [getRowCells, getColCells, getMiniGridCells]
+
+    # Loop through all the rows, columns and then mini-grids
+    for f in blockFunctions:
+        for i in range(9):
+            # Loop through every instance of the block (i.e. row, col, or 3x3 grid)
+            block = f(i)
+            candidatesByCell = getBlockCandidatesByCell(gridIn, block)
+            flatCandidatesByCell = [item for sublist in candidatesByCell for item in sublist]
+            hpPossValues = list(set([i for i in flatCandidatesByCell if flatCandidatesByCell.count(i) == 2]))
+            if len(hpPossValues) > 1:
+                hpPossCombos = list(combinations(hpPossValues, 2))
+                for c in hpPossCombos:
+                    possibleCells = [a for a in candidatesByCell if len(a) > 2 and c[0] in a and c[1] in a]
+                    if len(possibleCells) == 2:
+                        indexes = [index for index,cell in enumerate(candidatesByCell) if cell in possibleCells ]
+                        cellsToUpdate = [block[a] for a in indexes]
+                        candidatesToRemove = [x for x in range(1, 10) if x != c[0] and x != c[1]]
+                        [removeCandidateFromCells(gridIn, cellsToUpdate, z) for z in candidatesToRemove]
+                        
+    postCount = numOutstandingCandidates(gridIn)
+    #print(f"HiddenPairs - Before = {preCount}  Post = {postCount}")
+    return preCount - postCount
+
+
 def updateGrid(gridIn):
     #return doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
     #return doNakedTriples(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
-    return doXWing(gridIn) + doNakedTriples(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
+    #return doXWing(gridIn) + doNakedTriples(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
+    return doHiddenPairs(gridIn) + doXWing(gridIn) + doNakedTriples(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
     
 #============================================
 # Globals / Constants
@@ -442,7 +471,7 @@ try:
     sudukoGrid = createGrid()    
     drawGrid(sudukoGrid)
 
-    #doXWing(sudukoGrid)
+    #doHiddenPairs(sudukoGrid)
     #sys.exit()
 
     input("Press Enter to solve......")
