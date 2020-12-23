@@ -320,44 +320,61 @@ def doNakedPairs(gridIn):
 
 
 
-def doNakedTriples(gridIn):
-     # Identify and process Claiming Pairs or Triples
+def doNakedTriplesQuads(gridIn):
      # Three cells in a row, column or mini-grid, having only the same three candidates, or their subset, are called a naked triple.
      # All other appearances of the same candidates can be eliminated, if they are in the same row, column or mini-grid.
 
     preCount = numOutstandingCandidates(gridIn)
 
+    # Set up types list; 3 represents Triple and 4 Quad
+    types = [3]
+
     blockFunctions = [getRowCells, getColCells, getMiniGridCells]
 
     checkingSet = set()
 
-    # Loop through all the rows, columns and then mini-grids
-    for f in blockFunctions:
-        for i in range(9):
-            block = f(i)
-            # We're only interested in cells that have 2 or 3 candidates.          
-            possibles = [cell for cell in block if len(gridIn[cell][1]) == 2 or len(gridIn[cell][1]) == 3]
-            if len(possibles) < 3: continue
-           
-            # If there are more than 3 such cells, then we'll need to check the 3-cell combinations of these. 
-            combs = list(combinations(possibles, 3)) 
-            for comb in combs:
-                # Add the candidates for the combination to a set. A pointing triple will have 3 possibilities.
-                checkingSet.clear()
-                # Double check each cell in this combination has more than one combination, as these could re reduced from a previous combination 
-                if len(gridIn[comb[0]][1]) > 1 and len(gridIn[comb[1]][1]) > 1 and len(gridIn[comb[2]][1]) > 1:
-                    for j in range(3):
+    # Look for Triples first and then Quads. 
+
+    for t in types:
+
+        # Loop through all the rows, columns and then mini-grids
+        for f in blockFunctions:
+            for i in range(9):
+                block = f(i)
+
+                # We're only interested in cells that have 2 to 3 candidates for Triples, or 2 to 4 for Quads          
+                possibles = [cell for cell in block if len(gridIn[cell][1]) > 1 or len(gridIn[cell][1]) <= t]
+                
+                if len(possibles) < t: continue
+            
+                # If there are more than 3 (or 4) such cells, then we'll need to check the 3 (or 4) cell combinations of these. 
+                combs = list(combinations(possibles, t)) 
+                for comb in combs:
+                    # Add the candidates for the combination to a set. A pointing triple will have 3 possibilities.
+                    checkingSet.clear()
+                    # Double check each cell in this combination has more than one combination, as these could re reduced from a previous combination
+                    if t == 3:
+                        if len(gridIn[comb[0]][1]) <= 1 or len(gridIn[comb[1]][1]) <= 1 or len(gridIn[comb[2]][1]) <= 1:
+                            continue
+                    else:
+                        if len(gridIn[comb[0]][1]) <= 1 or len(gridIn[comb[1]][1]) <= 1 or len(gridIn[comb[2]][1]) <= 1 or len(gridIn[comb[3]][1]) <= 1:
+                            continue
+    
+                    for j in range(t):
                         [checkingSet.add(val) for val in gridIn[comb[j]][1]]
-                        if len(checkingSet) > 3: 
+                        if len(checkingSet) > t: 
                             break                 
-                    if len(checkingSet) == 3:
-                        # We have a pointing triple. Let's remove these as canidated from other cells in row, col or mini-grid.
-                        cellsToUpdate = [t for t in block if  t != comb[0] and t != comb[1] and t != comb[2]]
+                    if len(checkingSet) == t:
+                        # We have a pointing triple or Quad. Let's remove these as canidates from other cells in row, col or mini-grid.
+                        if t == 3:
+                            cellsToUpdate = [e for e in block if e != comb[0] and e != comb[1] and e != comb[2]]
+                        else:
+                             cellsToUpdate = [e for e in block if e != comb[0] and e != comb[1] and e != comb[2] and e != comb[3]]
                         [removeCandidateFromCells(gridIn, cellsToUpdate, c) for c in checkingSet ]
 
     postCount = numOutstandingCandidates(gridIn)
 
-    #print(f"Naked Triples - Before = {preCount}  Post = {postCount}")
+    #print(f"Naked Triples and Quads - Before = {preCount}  Post = {postCount}")
 
     return preCount - postCount
 
@@ -444,7 +461,7 @@ def updateGrid(gridIn):
     #return doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
     #return doNakedTriples(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
     #return doXWing(gridIn) + doNakedTriples(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
-    return doHiddenPairs(gridIn) + doXWing(gridIn) + doNakedTriples(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
+    return doHiddenPairs(gridIn) + doXWing(gridIn) + doNakedTriplesQuads(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
     
 #============================================
 # Globals / Constants
@@ -471,7 +488,7 @@ try:
     sudukoGrid = createGrid()    
     drawGrid(sudukoGrid)
 
-    #doHiddenPairs(sudukoGrid)
+    #doNakedTriplesQuads(sudukoGrid)
     #sys.exit()
 
     input("Press Enter to solve......")
