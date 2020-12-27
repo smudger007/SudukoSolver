@@ -458,11 +458,28 @@ def doHiddenPairs(gridIn):
 
 
 def updateGrid(gridIn):
-    #return doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
-    #return doNakedTriples(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
-    #return doXWing(gridIn) + doNakedTriples(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
     return doHiddenPairs(gridIn) + doXWing(gridIn) + doNakedTriplesQuads(gridIn) +  doClaimingPoT(gridIn) + doPPoT(gridIn) + doNakedPairs(gridIn) + doHiddenSingles(gridIn) + doNakedSingle(gridIn)
     
+def tryBruteForce(gridIn):
+
+    print(f"\nOK, we couldn't solve using the provided techniques... Let try brute force")
+
+    # Get list of cells with two candidates and try these
+    twoCandidateCells = [i for i, x in enumerate(gridIn) if len(x[1]) == 2]
+
+    for cell in twoCandidateCells:
+        # Try setting each of the two values, and see if it solves the grid...
+        for candidate in gridIn[cell][1]:
+            copyGrid = gridIn.copy()
+            copyGrid[cell] = (0, [candidate], copyGrid[cell][2])
+            solveCell(copyGrid, cell, copyGrid[cell])
+            iteration = 1
+            while (updateGrid(copyGrid) and numOutstandingCells(copyGrid) > 0 ):
+                iteration = iteration + 1
+            if numOutstandingCells(copyGrid) == 0: 
+                return copyGrid
+    return 0
+
 #============================================
 # Globals / Constants
 #============================================
@@ -488,19 +505,26 @@ try:
     sudukoGrid = createGrid()    
     drawGrid(sudukoGrid)
 
-    #doNakedTriplesQuads(sudukoGrid)
-    #sys.exit()
-
     input("Press Enter to solve......")
 
     iteration = 1
     while (updateGrid(sudukoGrid) and numOutstandingCells(sudukoGrid) > 0 ):
-        #drawGrid(sudukoGrid)
         print(f"After Iteration {iteration} - Outstanding Cells = {numOutstandingCells(sudukoGrid)} outstanding candidates = {numOutstandingCandidates(sudukoGrid)}")
         iteration = iteration + 1
 
     print(f"Complete - Outstanding Cells = {numOutstandingCells(sudukoGrid)} outstanding candidates = {numOutstandingCandidates(sudukoGrid)}")
     drawGrid(sudukoGrid)
 
+    if numOutstandingCells(sudukoGrid) > 0:
+        # We couldn't solve the grid using the techniques provided. As a last resort try brute force on cells with two candidates
+        bruteForceGrid = tryBruteForce(sudukoGrid)
+        if not bruteForceGrid:
+            print(f"Brute Force Failed!!!..... Outstanding Candidates")
+            for i in range(9):
+                print(f" {getBlockCandidatesByCell(sudukoGrid, getRowCells(i))}")
+        else:
+            print(f"Brute Force Success ")
+            drawGrid(bruteForceGrid)
+       
 except Exception as e:
     print("Aborting..../n", e)
