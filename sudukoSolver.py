@@ -7,7 +7,7 @@ from itertools import combinations
 #   Mark Smith
 #   -----------
 #
-#   V1.0 - DD-MMM-YYYY  - Initial Version
+#   V1.0 - 28-Dec-2020  - Initial Version
 #
 #   Terminology:
 #       - Grid - This is the main 9x9 suduko grid
@@ -23,6 +23,18 @@ from itertools import combinations
 #       - Dependant - Each cell is has a number of dependants. Setting the value on a cell will update its dependant.  
 #
 #       A description of the suduko techniques employed can be found here:  https://www.youtube.com/watch?v=b123EURtu3I 
+#   
+#   High Level Code Flow:
+#       - Create an initial full grid (no values set and all candidates possible)
+#       - Apply the initial set of values from file.
+#       - The following suduko techniques are then applied against the grid: Hidden Pairs, X Wing, Naked Triples, Naked Quads, Claim Pair/Triple, 
+#       - Pointing Pair/Triple, Naked Pairs, Hidden Singles, Naked Singles. Whenever a cell is solved, i.e. value set, then its dependants are 
+#         are updated. 
+#       - This is repeated until all values have been found, i.e. grid is solved, or it's not possible to solve any further cells. 
+#       - If the grid has not been solved then a brute force attack is attempted. This involves identifying cells with only two candidates and trying 
+#         each of these for each cell, following the logic above. 
+#       - If the brute force attack fails then we admit defeat and display the list of remaining candidates for each cell.
+#         Note: The solution has not failed yet...
 #==============================================================================================================================================
 
 #============================================
@@ -30,7 +42,9 @@ from itertools import combinations
 #============================================
 
 def createGrid():
-    # Create Initial blank grid.
+    # Each Cell is represented with a 3 value tuple. (value, list of candidates, list of dependants)
+    
+    # Create Initial grid 
     gridOut = [(0, [1,2,3,4,5,6,7,8,9], getMyDependants(x)) for x in range(CELLS)]
     
     # Load initial values from file.
@@ -44,6 +58,7 @@ def createGrid():
 
 def loadValuesFromFile():
     
+    # Reads input from file and returns as a list of values for each cell index.
     with open("grid.txt") as f:
         content = f.read().replace('\n', '')
     f.close()
@@ -129,9 +144,6 @@ def getMyMiniGridPals(myCellRef):
 def getMyDependants(myCellRef):
     return list(set(getMyColPals(myCellRef) + getMyRowPals(myCellRef) + getMyMiniGridPals(myCellRef)))
 
-def getBlockIndexes(gridIn, blockIn):
-    return 0
-
 def getBlockValues(gridIn,blockIn):
     return [gridIn[x][0] for x in blockIn if gridIn[x][0] != 0 ]
 
@@ -201,27 +213,29 @@ def checkMiniRowColForPPoT(gridIn, miniBlockIn, typeIn):
                     cellsToUpdate = [t for t in fullLine if t not in miniLine]
                     removeCandidateFromCells(gridIn, cellsToUpdate, c)
 
-def solveCell(gridIn, indexIn, cellIn):
+def solveCell(gridIn, indexIn):
      # Cell is solved. So, set it's value, empty its possibility list and inform its dependants.
-    newVal = cellIn[1][0]
-    gridIn[indexIn] = (newVal, [], cellIn[2])
+    newVal = gridIn[indexIn][1][0]
+    gridIn[indexIn] = (newVal, [], gridIn[indexIn][2])
     
     # We now need to inform its dependants, so they can remove the value from their list of possible values.
-    for dependant in cellIn[2]:
+    for dependant in gridIn[indexIn][2]:
         # Simply remove the value just set from the dependant (as it can't be this value)
-        gridIn[dependant] = (gridIn[dependant][0], [x for x in gridIn[dependant][1] if x != newVal] ,gridIn[dependant][2] )
+        gridIn[dependant] = (gridIn[dependant][0], [x for x in gridIn[dependant][1] if x != newVal], gridIn[dependant][2] )
 
 def doNakedSingle(gridIn):
     updateCount = 0
     #  Loop through the grid processing naked singles, i.e. cells with only one possibility left
     for i, cell in enumerate(gridIn):
         if (len(cell[1]) == 1 and cell[0] == 0):
-            solveCell(gridIn, i, cell)        
+            solveCell(gridIn, i)        
             updateCount = updateCount +  1
     return updateCount
 
 def doHiddenSingles(gridIn):
-    # good comment needed. 
+    # A cell with multiple candidates is called a Hidden Single if one of the candidates is the only candidate in a row, a column
+    # or a mini-grid. The single candidate is the solution to the cell. All other appearances of the same candidate, if any, are elimiated 
+    # if they can be seen by the single. 
 
     preCount = numOutstandingCandidates(gridIn)
     lineFunctions = [getRowCells, getColCells, getMiniGridCells]
@@ -236,11 +250,13 @@ def doHiddenSingles(gridIn):
                 count = 0
                 for j in block:
                     if i in gridIn[j][1]:
-                        specialCandidate = j
+                        hiddenSingle = j
                         count = count + 1
                         if count > 1:
                             break
-                if count == 1: gridIn[specialCandidate] = (0, [i], gridIn[specialCandidate][2])
+                # If just once instance of the value then we have a hidden single. Let's set it possible value, which will lead 
+                # to the cell being solved as a naked single.
+                if count == 1: gridIn[hiddenSingle] = (0, [i], gridIn[hiddenSingle][2])
                     
     postCount = numOutstandingCandidates(gridIn)
     return preCount - postCount
@@ -323,11 +339,14 @@ def doNakedPairs(gridIn):
 def doNakedTriplesQuads(gridIn):
      # Three cells in a row, column or mini-grid, having only the same three candidates, or their subset, are called a naked triple.
      # All other appearances of the same candidates can be eliminated, if they are in the same row, column or mini-grid.
+     #
+     # Four cells in a row, column or mini-grid, having only the same four candidates, or their subset, are called a naked quad.
+     # All other appearances of the same candidates can be eliminated, if they are in the same row, column or mini-grid.
 
     preCount = numOutstandingCandidates(gridIn)
 
     # Set up types list; 3 represents Triple and 4 Quad
-    types = [3]
+    types = [3,4]
 
     blockFunctions = [getRowCells, getColCells, getMiniGridCells]
 
@@ -373,9 +392,6 @@ def doNakedTriplesQuads(gridIn):
                         [removeCandidateFromCells(gridIn, cellsToUpdate, c) for c in checkingSet ]
 
     postCount = numOutstandingCandidates(gridIn)
-
-    #print(f"Naked Triples and Quads - Before = {preCount}  Post = {postCount}")
-
     return preCount - postCount
 
 def doXWing(gridIn):
@@ -472,7 +488,7 @@ def tryBruteForce(gridIn):
         for candidate in gridIn[cell][1]:
             copyGrid = gridIn.copy()
             copyGrid[cell] = (0, [candidate], copyGrid[cell][2])
-            solveCell(copyGrid, cell, copyGrid[cell])
+            solveCell(copyGrid, cell)
             iteration = 1
             while (updateGrid(copyGrid) and numOutstandingCells(copyGrid) > 0 ):
                 iteration = iteration + 1
