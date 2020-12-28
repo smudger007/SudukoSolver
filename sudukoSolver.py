@@ -28,7 +28,7 @@ from itertools import combinations
 #       - Create an initial full grid (no values set and all candidates possible)
 #       - Apply the initial set of values from file.
 #       - The following suduko techniques are then applied against the grid: Hidden Pairs, X Wing, Naked Triples, Naked Quads, Claim Pair/Triple, 
-#       - Pointing Pair/Triple, Naked Pairs, Hidden Singles, Naked Singles. Whenever a cell is solved, i.e. value set, then its dependants are 
+#         Pointing Pair/Triple, Naked Pairs, Hidden Singles, Naked Singles. Whenever a cell is solved, i.e. value set, then its dependants are 
 #         are updated. 
 #       - This is repeated until all values have been found, i.e. grid is solved, or it's not possible to solve any further cells. 
 #       - If the grid has not been solved then a brute force attack is attempted. This involves identifying cells with only two candidates and trying 
